@@ -2,14 +2,21 @@
 
 This is a maintained personal fork of [yujitach/MenuMeters](https://github.com/yujitach/MenuMeters), built as a standalone macOS menu bar app.
 
-The current fork release is `2.1.6.6`. It keeps the original MenuMeters behavior, improves Chinese localization, and adds Apple Silicon GPU/ANE monitoring.
+The current fork release is `2.1.6.7`. It keeps the original MenuMeters behavior, improves Chinese localization, and adds Apple Silicon GPU/ANE monitoring.
+
+## What's New In 2.1.6.7
+
+- Added GPU memory bandwidth, media engine load, and GPU memory stats, with broader M1–M5 temperature sensor coverage.
+- Fixed GPU graph freeze, menubar extra width jitter, and a disappearing network status item.
+- Restored disk arrow styles, made the disk picker show the current selection, and color-coded disk read/write throughput.
+- Moved the ANE power toggle onto the GPU preferences pane and fixed the memory update-interval display.
+- Removed Sparkle from the default `MenuMeters` scheme. Local releases use ad-hoc signing.
 
 ## What's New In 2.1.6.6
 
-- Removed Sparkle auto-update integration from the default `MenuMeters` scheme; local releases use ad-hoc signing.
-- Removed dead update-check UI from the app menu, dock menu, and preferences About tab while keeping color tint and Activity Monitor pane controls.
-- Fixed preferences registration for the `hiddenBySystem` alert when menu bar meters are hidden by macOS.
-- Aligned the `MenuMeters` Xcode scheme with the no-Sparkle target used for this fork.
+- Added disk throughput display with per-physical-disk selection.
+- Fixed a crash in hidden status item detection.
+- Redesigned the disk settings pane to match the network page.
 
 ## What's New In 2.1.6.5
 
