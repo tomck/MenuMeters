@@ -153,7 +153,9 @@
 	pppControl = [MenuMeterNetPPP sharedPPP];
 	netHistoryData = [NSMutableArray array];
 	netHistoryIntervals = [NSMutableArray array];
-	if (!(netConfig && netStats && netHistoryData)) {
+	// Top network processes reader (ported from leeliu/MenuMeters v2.2.0, GPL-2.0)
+	netTopProcesses = [[MenuMeterNetTopProcesses alloc] init];
+	if (!(netConfig && netStats && netHistoryData && netTopProcesses)) {
 		NSLog(@"MenuMeterNet unable to load data gatherers/controllers. Abort.");
 		return nil;
 	}
@@ -658,6 +660,28 @@
 					   keyEquivalent:@""] setEnabled:NO];
 	}
 
+	// Top network processes - pre-allocated items (ported from
+	// leeliu/MenuMeters v2.2.0, GPL-2.0; mirrors CPU pattern). Additive
+	// only: existing interface/throughput sections above are preserved.
+	netProcessInsertedItems = [NSMutableArray array];
+	{
+		NSMenuItem *sepItem = [NSMenuItem separatorItem];
+		[extraMenu addItem:sepItem];
+		sepItem.hidden = YES;
+		[netProcessInsertedItems addObject:sepItem];
+		NSMenuItem *headerItem = [extraMenu addItemWithTitle:@"Top Network Processes:" action:nil keyEquivalent:@""];
+		[headerItem setEnabled:NO];
+		headerItem.hidden = YES;
+		[netProcessInsertedItems addObject:headerItem];
+		for (NSInteger i = 0; i < kNetProcessCountMax; i++) {
+			NSMenuItem *item = [extraMenu addItemWithTitle:@"" action:nil keyEquivalent:@""];
+			item.indentationLevel = 1;
+			[item setEnabled:NO];
+			item.hidden = YES;
+			[netProcessInsertedItems addObject:item];
+		}
+	}
+
 	// Add utility items
 	[extraMenu addItem:[NSMenuItem separatorItem]];
 	if ([[NSWorkspace sharedWorkspace] fullPathForApplication:@"Network Utility.app"]) {
@@ -680,6 +704,23 @@
 	return extraMenu;
 
 } // menu
+
+///////////////////////////////////////////////////////////////
+//
+//	NSMenuDelegate — top processes lifecycle
+//	(ported from leeliu/MenuMeters v2.2.0, GPL-2.0)
+//
+///////////////////////////////////////////////////////////////
+
+- (void)menuWillOpen:(NSMenu *)menu {
+	[netTopProcesses startUpdateProcessList];
+	[super menuWillOpen:menu];
+}
+
+- (void)menuDidClose:(NSMenu *)menu {
+	[netTopProcesses stopUpdateProcessList];
+	[super menuDidClose:menu];
+}
 
 ///////////////////////////////////////////////////////////////
 //
@@ -1213,6 +1254,65 @@
 			}
 		}
 	} // end details loop
+
+	// Update top network processes (ported from leeliu/MenuMeters v2.2.0,
+	// GPL-2.0; mirrors CPU pattern). Additive only.
+	{
+		int maxCount = [ourPrefs netMaxProcessCount];
+		if (maxCount == 0) {
+			NSMenuItem *sepItem = netProcessInsertedItems[0];
+			NSMenuItem *headerItem = netProcessInsertedItems[1];
+			sepItem.hidden = YES;
+			headerItem.hidden = YES;
+			for (NSInteger ndx = 0; ndx < kNetProcessCountMax; ndx++) {
+				NSMenuItem *mi = netProcessInsertedItems[ndx + 2];
+				mi.hidden = YES;
+			}
+		} else {
+		NSArray *topProcesses = [netTopProcesses runningProcessesByNetUsage:maxCount];
+		// Sort by highest total download + upload
+		topProcesses = [topProcesses sortedArrayUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
+			double totalA = [a[kNetProcessBytesInPerSecKey] doubleValue] + [a[kNetProcessBytesOutPerSecKey] doubleValue];
+			double totalB = [b[kNetProcessBytesInPerSecKey] doubleValue] + [b[kNetProcessBytesOutPerSecKey] doubleValue];
+			return [@(totalB) compare:@(totalA)];
+		}];
+		NSMenuItem *sepItem = netProcessInsertedItems[0];
+		NSMenuItem *headerItem = netProcessInsertedItems[1];
+		sepItem.hidden = (topProcesses.count == 0);
+		headerItem.hidden = (topProcesses.count == 0);
+		for (NSInteger ndx = 0; ndx < kNetProcessCountMax; ndx++) {
+			NSMenuItem *mi = netProcessInsertedItems[ndx + 2];
+			if (ndx < (NSInteger)topProcesses.count) {
+				NSString *name = topProcesses[(NSUInteger)ndx][kNetProcessNameKey];
+				double inPerSec = [topProcesses[(NSUInteger)ndx][kNetProcessBytesInPerSecKey] doubleValue];
+				double outPerSec = [topProcesses[(NSUInteger)ndx][kNetProcessBytesOutPerSecKey] doubleValue];
+				NSString *inStr = [self throughputStringForBytesPerSecond:inPerSec withSpace:YES];
+				NSString *outStr = [self throughputStringForBytesPerSecond:outPerSec withSpace:YES];
+				NSString *title = [NSString stringWithFormat:@"%@  \u2193%@  \u2191%@", name, inStr, outStr];
+				mi.title = title;
+				mi.hidden = (title.length == 0);
+
+				NSNumber *pid = @([topProcesses[(NSUInteger)ndx][kNetProcessPIDKey] intValue]);
+				NSRunningApplication *app = [NSRunningApplication runningApplicationWithProcessIdentifier:pid.intValue];
+				NSImage *icon = app.icon;
+				if (!icon) {
+					static NSImage *defaultIcon = nil;
+					if (!defaultIcon) {
+						defaultIcon = [[NSWorkspace sharedWorkspace] iconForFile:@"/bin/bash"];
+					}
+					icon = defaultIcon;
+				}
+				icon = [icon copy];
+				icon.size = NSMakeSize(16, 16);
+				mi.image = icon;
+			} else {
+				mi.title = @"";
+				mi.hidden = YES;
+				mi.image = nil;
+			}
+		}
+		} // end else (maxCount > 0)
+	}
 
 	// Force the menu to redraw
 	LiveUpdateMenu(extraMenu);
