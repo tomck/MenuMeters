@@ -263,14 +263,13 @@ static void scChangeCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, vo
 }
 -(void)hiddenBySystem:(NSNotification*)notification
 {
-    // Disabled; menu-bar hidden detection is too noisy to alert on.
-    // Cf. YuyaIwata/MenuMeters#Tahoe: on macOS 26 (Tahoe) and later,
-    // isInstalledButHiddenBySystem gives false positives because the
-    // CGWindowList on-screen check no longer lists status-item windows
-    // even when shown, and Tahoe has its own "Allow in the Menu Bar"
-    // control, so the system manages hiding itself. We therefore do not
-    // post hiddenBySystem at all (see timerFired in
-    // MenuMetersMenuExtraBase.m).
+    // ponytail (https://ponytail.dev/ AI agent): disabled; menu-bar hidden
+    // detection is too noisy to alert on.
+    // Consolidation note: cf. YuyaIwata/MenuMeters Tahoe finding — on
+    // macOS 26+, isInstalledButHiddenBySystem false-fires (CGWindowList
+    // no longer lists status-item windows) and Tahoe manages hiding via
+    // its own "Allow in the Menu Bar" control. We therefore do not post
+    // hiddenBySystem at all (see timerFired in MenuMetersMenuExtraBase.m).
 }
 -(instancetype)initWithAboutFileName:(NSString*)about
 {
