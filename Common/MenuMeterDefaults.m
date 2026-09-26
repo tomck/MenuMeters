@@ -347,7 +347,7 @@
 
 - (int)gpuDisplayMode {
     return [self loadBitFlagPref:kGPUDisplayModePref
-                      validFlags:kGPUDisplayValidFlags
+                      validFlags:kGPUDisplaySupportedFlags
                     defaultValue:kGPUDisplayDefault];
 }
 
@@ -375,7 +375,7 @@
 }
 
 - (void)saveGpuDisplayMode:(int)mode {
-    [self saveIntPref:kGPUDisplayModePref value:mode];
+    [self saveIntPref:kGPUDisplayModePref value:(mode & kGPUDisplaySupportedFlags)];
 }
 
 - (void)saveGpuGraphLength:(int)length {

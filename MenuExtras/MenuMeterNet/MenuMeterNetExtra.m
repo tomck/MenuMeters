@@ -92,6 +92,7 @@
 #define kCopyIPv4Title					@"Copy IPv4 address"
 #define kCopyIPv6Title					@"Copy IPv6 address"
 #define kResetTrafficTotalsTitle        @"Reset traffic totals"
+#define kNetProcessTitle				@"Top Network Processes:"
 #define kPPPConnectTitle				@"Connect"
 #define kPPPDisconnectTitle				@"Disconnect"
 #define kNoInterfaceErrorMessage		@"No Active Interfaces"
@@ -669,7 +670,7 @@
 		[extraMenu addItem:sepItem];
 		sepItem.hidden = YES;
 		[netProcessInsertedItems addObject:sepItem];
-		NSMenuItem *headerItem = [extraMenu addItemWithTitle:@"Top Network Processes:" action:nil keyEquivalent:@""];
+		NSMenuItem *headerItem = [extraMenu addItemWithTitle:[[NSBundle mainBundle] localizedStringForKey:kNetProcessTitle value:nil table:nil] action:nil keyEquivalent:@""];
 		[headerItem setEnabled:NO];
 		headerItem.hidden = YES;
 		[netProcessInsertedItems addObject:headerItem];
@@ -713,8 +714,12 @@
 ///////////////////////////////////////////////////////////////
 
 - (void)menuWillOpen:(NSMenu *)menu {
-	[netTopProcesses startUpdateProcessList];
 	[super menuWillOpen:menu];
+	if ([ourPrefs netMaxProcessCount] > 0) {
+		[netTopProcesses startUpdateProcessList];
+	} else {
+		[netTopProcesses stopUpdateProcessList];
+	}
 }
 
 - (void)menuDidClose:(NSMenu *)menu {

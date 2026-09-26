@@ -88,6 +88,13 @@
 
     [extraMenu addItem:[NSMenuItem separatorItem]];
     [self addStandardMenuEntriesTo:extraMenu];
+#if !TARGET_CPU_ARM64
+    [[extraMenu itemAtIndex:kGPUFrequencyInfoMenuIndex] setHidden:YES];
+    [[extraMenu itemAtIndex:kGPUPowerInfoMenuIndex] setHidden:YES];
+    [[extraMenu itemAtIndex:kGPUANEPowerInfoMenuIndex] setHidden:YES];
+    [[extraMenu itemAtIndex:kGPUBandwidthInfoMenuIndex] setHidden:YES];
+    [[extraMenu itemAtIndex:kGPUMediaInfoMenuIndex] setHidden:YES];
+#endif
 
     percentFormatter = [[NSNumberFormatter alloc] init];
     percentFormatter.minimumFractionDigits = 0;

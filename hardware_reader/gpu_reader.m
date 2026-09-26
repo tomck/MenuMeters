@@ -56,7 +56,3 @@ GPUStats GPUReadStats(void) {
 
     return stats;
 }
-
-float GPUUsagePercent(void) {
-    return GPUReadStats().utilization;
-}

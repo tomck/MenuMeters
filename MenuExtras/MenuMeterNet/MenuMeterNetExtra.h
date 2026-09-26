@@ -62,7 +62,6 @@
 	// Additive only: existing interface/throughput sections are preserved.
 	MenuMeterNetTopProcesses			*netTopProcesses;
 	NSMutableArray					*netProcessInsertedItems;
-	NSTimer							*processRefreshTimer;
 
 } // MenuMeterNetExtra
 

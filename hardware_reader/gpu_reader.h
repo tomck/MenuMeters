@@ -27,7 +27,4 @@ typedef struct {
 // highest utilization (handles multi-GPU / eGPU setups).
 extern GPUStats GPUReadStats(void);
 
-// Convenience wrapper returning just the utilization (0-100, or -1).
-extern float GPUUsagePercent(void);
-
 #endif /* gpu_reader_h */

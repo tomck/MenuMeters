@@ -7,6 +7,7 @@
 //
 
 #import "MenuMeterMemTopProcesses.h"
+#import "MenuMeterMem.h"
 #import <libproc.h>
 #import <sys/proc_info.h>
 
@@ -15,12 +16,16 @@ NSString* const kMemProcessNameKey      = @"processName";
 NSString* const kMemProcessMemBytesKey  = @"memBytes";
 NSString* const kMemTopProcessesUpdatedNotification = @"MenuMeterMemTopProcessesUpdated";
 
+@interface MenuMeterMemTopProcesses (Private)
+- (void)consumeTaskOutput:(NSData *)chunk fileHandle:(NSFileHandle *)fh;
+@end
+
 @implementation MenuMeterMemTopProcesses
 {
     NSArray *processes;
     NSTask *task;
     NSPipe *outPipe;
-    NSString *buffer;
+    NSMutableData *buffer;
     int parseState; // 0 = before PID header, 1 = reading process lines
     NSMutableArray *tempArray;
 }
@@ -36,16 +41,23 @@ NSString* const kMemTopProcessesUpdatedNotification = @"MenuMeterMemTopProcesses
     return self;
 }
 
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [self stopUpdateProcessList];
+}
+
 - (void)startUpdateProcessList {
+    [self stopUpdateProcessList];
+
     // Immediate fetch using proc_pidinfo (instant, no subprocess)
     [self fetchProcessListDirect];
 
     // Start continuous top for ongoing updates (first output after ~2s)
     parseState = 0;
-    buffer = [NSString string];
+    buffer = [NSMutableData data];
     task = [NSTask new];
     task.launchPath = @"/usr/bin/top";
-    task.arguments = @[@"-s", @"2", @"-l", @"0", @"-o", @"mem", @"-stats", @"pid,mem,command", @"-n", @"15"];
+    task.arguments = @[@"-s", @"2", @"-l", @"0", @"-o", @"mem", @"-stats", @"pid,mem,command", @"-n", [NSString stringWithFormat:@"%d", kMemProcessCountMax]];
     outPipe = [NSPipe pipe];
     task.standardOutput = outPipe;
     task.standardError = [NSPipe pipe];
@@ -53,6 +65,9 @@ NSString* const kMemTopProcessesUpdatedNotification = @"MenuMeterMemTopProcesses
     @try {
         [task launch];
     } @catch (NSException *e) {
+        task = nil;
+        outPipe = nil;
+        buffer = nil;
         return;
     }
 }
@@ -103,9 +118,8 @@ NSString* const kMemTopProcessesUpdatedNotification = @"MenuMeterMemTopProcesses
         return [b[kMemProcessMemBytesKey] compare:a[kMemProcessMemBytesKey]];
     }];
 
-    // Keep top 15
-    if (list.count > 15) {
-        [list removeObjectsInRange:NSMakeRange(15, list.count - 15)];
+    if (list.count > (NSUInteger)kMemProcessCountMax) {
+        [list removeObjectsInRange:NSMakeRange(kMemProcessCountMax, list.count - kMemProcessCountMax)];
     }
 
     processes = list;
@@ -113,7 +127,9 @@ NSString* const kMemTopProcessesUpdatedNotification = @"MenuMeterMemTopProcesses
 }
 
 - (void)stopUpdateProcessList {
-    [task terminate];
+    if (task.running) {
+        [task terminate];
+    }
     task = nil;
     outPipe = nil;
     buffer = nil;
@@ -126,18 +142,38 @@ NSString* const kMemTopProcessesUpdatedNotification = @"MenuMeterMemTopProcesses
     }
     NSData *d = [n userInfo][@"NSFileHandleNotificationDataItem"];
     if ([d length]) {
-        NSString *s = [[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding];
-        if (s) {
-            buffer = [buffer stringByAppendingString:s];
-        }
-        while ([buffer containsString:@"\n"]) {
-            NSUInteger i = [buffer rangeOfString:@"\n"].location;
-            NSString *line = [buffer substringToIndex:i];
-            [self dealWithLine:line];
-            buffer = [buffer substringFromIndex:i + 1];
-        }
-        [fh readInBackgroundAndNotifyForModes:@[NSRunLoopCommonModes]];
+        [self consumeTaskOutput:d fileHandle:fh];
     }
+}
+
+- (void)consumeTaskOutput:(NSData *)chunk fileHandle:(NSFileHandle *)fh {
+    if (!buffer) {
+        buffer = [NSMutableData data];
+    }
+    [buffer appendData:chunk];
+
+    const uint8_t *bytes = buffer.bytes;
+    NSUInteger length = buffer.length;
+    NSUInteger lineStart = 0;
+    for (NSUInteger i = 0; i < length; i++) {
+        if (bytes[i] != '\n') {
+            continue;
+        }
+        NSUInteger lineLength = i - lineStart;
+        if (lineLength > 0 && bytes[i - 1] == '\r') {
+            lineLength -= 1;
+        }
+        NSData *lineData = [buffer subdataWithRange:NSMakeRange(lineStart, lineLength)];
+        NSString *line = [[NSString alloc] initWithData:lineData encoding:NSUTF8StringEncoding];
+        if (line) {
+            [self dealWithLine:line];
+        }
+        lineStart = i + 1;
+    }
+    if (lineStart > 0) {
+        [buffer replaceBytesInRange:NSMakeRange(0, lineStart) withBytes:NULL length:0];
+    }
+    [fh readInBackgroundAndNotifyForModes:@[NSRunLoopCommonModes]];
 }
 
 - (void)dealWithLine:(NSString *)s {

@@ -81,6 +81,7 @@
 #define kMBLabel							@"MB"
 #define kGBLabel                            @"GB"
 #define kMemDisplayGBMenuTitle              @"Show Memory Text in GB"
+#define kMemProcessTitle                    @"Top Memory Processes:"
 
 ///////////////////////////////////////////////////////////////
 //
@@ -190,7 +191,6 @@
                                                 action:@selector(toggleMemoryTextUnit:)
                                          keyEquivalent:@""];
     [memDisplayGBMenuItem setTarget:self];
-    [extraMenu addItem:[NSMenuItem separatorItem]];
 	// Top memory processes (ported from leeliu/MenuMeters v2.2.0, GPL-2.0).
 	// Pre-allocated and hidden until data arrives; existing sections above
 	// are preserved unchanged.
@@ -205,7 +205,7 @@
 		[extraMenu addItem:sepItem];
 		sepItem.hidden = YES;
 		[memProcessMenuItems addObject:sepItem];
-		NSMenuItem *headerItem = [extraMenu addItemWithTitle:@"Top Memory Processes:" action:nil keyEquivalent:@""];
+		NSMenuItem *headerItem = [extraMenu addItemWithTitle:[[NSBundle mainBundle] localizedStringForKey:kMemProcessTitle value:nil table:nil] action:nil keyEquivalent:@""];
 		[headerItem setEnabled:NO];
 		headerItem.hidden = YES;
 		[memProcessMenuItems addObject:headerItem];
@@ -901,14 +901,24 @@
 ///////////////////////////////////////////////////////////////
 
 - (void)menuWillOpen:(NSMenu *)menu {
-	[memTopProcesses startUpdateProcessList];
-	processRefreshTimer = [NSTimer timerWithTimeInterval:2.0
-												 target:self
-											   selector:@selector(processRefreshFired)
-											   userInfo:nil
-												repeats:YES];
-	[[NSRunLoop mainRunLoop] addTimer:processRefreshTimer forMode:NSRunLoopCommonModes];
 	[super menuWillOpen:menu];
+
+	[processRefreshTimer invalidate];
+	processRefreshTimer = nil;
+
+	if ([ourPrefs memMaxProcessCount] > 0) {
+		[memTopProcesses startUpdateProcessList];
+		processRefreshTimer = [NSTimer timerWithTimeInterval:2.0
+													 target:self
+												   selector:@selector(processRefreshFired)
+												   userInfo:nil
+													repeats:YES];
+		[[NSRunLoop mainRunLoop] addTimer:processRefreshTimer forMode:NSRunLoopCommonModes];
+		[self updateProcessMenuItems];
+	} else {
+		[memTopProcesses stopUpdateProcessList];
+		[self updateProcessMenuItems];
+	}
 }
 
 - (void)menuDidClose:(NSMenu *)menu {
@@ -955,9 +965,9 @@
 			double memBytes = [topProcesses[(NSUInteger)ndx][kMemProcessMemBytesKey] doubleValue];
 			NSString *memStr;
 			if (memBytes >= 1073741824.0) {
-				memStr = [NSString stringWithFormat:@"%.1f GB", memBytes / 1073741824.0];
+				memStr = [NSString stringWithFormat:@"%.1f %@", memBytes / 1073741824.0, [localizedStrings objectForKey:kGBLabel]];
 			} else {
-				memStr = [NSString stringWithFormat:@"%.0f MB", memBytes / 1048576.0];
+				memStr = [NSString stringWithFormat:@"%.0f %@", memBytes / 1048576.0, [localizedStrings objectForKey:kMBLabel]];
 			}
 			NSString *title = [NSString stringWithFormat:@"%@  %@", name, memStr];
 			mi.title = title;

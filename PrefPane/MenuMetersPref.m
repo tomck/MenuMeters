@@ -54,6 +54,9 @@
 
 // GPU pane
 - (void)setupGPUPaneWithFormatter:(NSNumberFormatter *)intervalFormatter;
+#if !TARGET_CPU_ARM64
+- (void)configureIntelGPUPaneControls;
+#endif
 - (void)setupCPUPageHardwareControls;
 - (void)setupDiskPane;
 - (void)notifyAllMenuExtrasOfLayoutChange;
@@ -323,9 +326,7 @@ static void scChangeCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, vo
 	[memIntervalDisplay setFormatter:intervalFormatter];
 	[diskIntervalDisplay setFormatter:intervalFormatter];
 	[netIntervalDisplay setFormatter:intervalFormatter];
-#if TARGET_CPU_ARM64
     [self setupGPUPaneWithFormatter:intervalFormatter];
-#endif
     [self setupCPUPageHardwareControls];
     [self setupDiskPane];
 
@@ -516,7 +517,24 @@ static void scChangeCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, vo
     [view addSubview:[self labelWithTitle:@"ANE" frame:NSMakeRect(350, 170, 85, 18)]];
     gpuANEColor = [self colorWellWithFrame:NSMakeRect(350, 132, 53, 30) action:@selector(gpuPrefChange:)];
     [view addSubview:gpuANEColor];
+#if !TARGET_CPU_ARM64
+    [self configureIntelGPUPaneControls];
+#endif
 }
+
+#if !TARGET_CPU_ARM64
+- (void)configureIntelGPUPaneControls
+{
+    NSString *asOnly = [self localizedPreferenceString:@"Apple Silicon only"];
+    NSArray *toggles = @[gpuFrequencyToggle, gpuPowerToggle, gpuANEPowerToggle, gpuBandwidthToggle, gpuMediaToggle];
+    for (NSButton *toggle in toggles) {
+        toggle.title = [NSString stringWithFormat:@"%@ (%@)", toggle.title, asOnly];
+        toggle.enabled = NO;
+        toggle.state = NSOffState;
+    }
+    gpuANEColor.enabled = NO;
+}
+#endif
 
 - (void)setupCPUPageHardwareControls
 {
@@ -1056,6 +1074,7 @@ static void scChangeCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, vo
     if ([gpuGraphToggle state] == NSOnState) {
         mode |= kGPUDisplayGraph;
     }
+#if TARGET_CPU_ARM64
     if ([gpuFrequencyToggle state] == NSOnState) {
         mode |= kGPUDisplayFrequency;
     }
@@ -1071,6 +1090,7 @@ static void scChangeCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, vo
     if ([gpuMediaToggle state] == NSOnState) {
         mode |= kGPUDisplayMedia;
     }
+#endif
     if ([gpuMemoryToggle state] == NSOnState) {
         mode |= kGPUDisplayMemory;
     }
@@ -1127,6 +1147,19 @@ static void scChangeCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, vo
     [gpuBandwidthToggle setState:(mode & kGPUDisplayBandwidth) ? NSOnState : NSOffState];
     [gpuMediaToggle setState:(mode & kGPUDisplayMedia) ? NSOnState : NSOffState];
     [gpuMemoryToggle setState:(mode & kGPUDisplayMemory) ? NSOnState : NSOffState];
+#if !TARGET_CPU_ARM64
+    [gpuFrequencyToggle setState:NSOffState];
+    [gpuPowerToggle setState:NSOffState];
+    [gpuANEPowerToggle setState:NSOffState];
+    [gpuBandwidthToggle setState:NSOffState];
+    [gpuMediaToggle setState:NSOffState];
+    gpuFrequencyToggle.enabled = NO;
+    gpuPowerToggle.enabled = NO;
+    gpuANEPowerToggle.enabled = NO;
+    gpuBandwidthToggle.enabled = NO;
+    gpuMediaToggle.enabled = NO;
+    gpuANEColor.enabled = NO;
+#endif
 
     [gpuInterval setDoubleValue:[ourPrefs gpuInterval]];
     [gpuIntervalDisplay takeDoubleValueFrom:gpuInterval];
